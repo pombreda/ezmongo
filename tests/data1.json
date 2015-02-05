@@ -2,9 +2,9 @@ db.sidtest.insert({"ccypair" : "ALL","collat" : "AMERICAN","date" : ISODate("201
 
 db.sidtest.insert({"ccypair" : "ALL","collat" : "INDIAN","date" : ISODate("2015-01-21T17:00:00Z"), "tradedate":20150121, "metric": "metricA","vals": {"0": {"orders" : 7,},"3": {"orders" : 4,}}})
 
-db.sidtest.insert({"ccypair" : "ALL","collat" : "INDIAN","date" : ISODate("2015-01-21T18:00:00Z"),"tradedate":20150121, "metric": "metricA","vals": {"0": {"orders" : 6,},"2": {"orders" : 4,}}})
+db.sidtest.insert({"type" : "ALL","user" : "auser","date" : ISODate("2015-01-21T18:00:00Z"),"tradedate":20150121, "metric": "metricA","vals": {"0": {"orders" : 6,},"2": {"orders" : 4,}}})
 
-db.sidtest.insert({"ccypair" : "ALL","collat" : "INDIAN","date" : ISODate("2015-01-22T18:00:00Z"), "tradedate":20150122, "metric": "metricA","vals": {"0": {"orders" : 6,},"2": {"orders" : 4,}}})
+db.sidtest.insert({"type" : "ALL","user" : "auser","date" : ISODate("2015-01-22T18:00:00Z"), "tradedate":20150122, "metric": "metricA","vals": {"0": {"orders" : 6,},"2": {"orders" : 4,}}})
 
 
 ARRAY
@@ -15,7 +15,7 @@ GET SUM OF ALL ORDERS FOR ALL MINUTES IN ALL MATCHED DOCUMENTS
 
 - db.sidtest.aggregate([{
     $match: {
-        ccypair: 'ALL',
+        type: 'ALL',
         tradedate: 20150122
     },
     {$unwind: "$vals"}, {$group: {_id: null, "total_orders": {$sum: '$vals.orders'}}}
@@ -25,15 +25,15 @@ GET SUM OF ALL ORDERS FOR ALL MINUTES IN ALL MATCHED DOCUMENTS
 GET TOP 10 MINUTES WITH LARGEST NUMBER OF ORDERS IN WHOLE TRADING DAY
 
 - db.sidtest.aggregate([$match: {
-        ccypair: 'ALL',
+        type: 'ALL',
         tradedate: 20150122
     }, {$unwind: "$vals"}, {$sort: {'vals.orders': -1}}, {$limit: 10}])
 
 
 
 {
-    "ccypair" : "ALL",
-    "collat" : "INDIAN",
+    "type" : "ALL",
+    "user" : "auser",
     "date" : datetime.datetime.utcnow(),
     "tradedate":20150122,
     "metric": "metricA",
@@ -50,14 +50,14 @@ GET TOP 10 MINUTES WITH LARGEST NUMBER OF ORDERS IN WHOLE TRADING DAY
 
 match = {
     $match: {
-        ccypair: 'ALL',
+        type: 'ALL',
         tradedate: 20150122
     }
 }
 db.sidtest.aggregate([match])
 
 
-select sum(order) from hsdata where tradedate=20150900 and ccypair='all' and collat='america'
+select sum(order) from hsdata where tradedate=20150900 and type='all' and user='auser'
 
 #- take all documents for tradedate/collat/ccypair
 #- for each document sum orders in each minute

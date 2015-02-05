@@ -14,7 +14,7 @@ coll = db.sidtest
 num = 100000
 def insert_array_doc():
     coll.remove({})
-    doc = {"ccypair" : "ALL","collat" : "INDIAN","date" : datetime.datetime.utcnow(), "tradedate":20150122, "metric": "metricA", }
+    doc = {"type" : "ALL","user" : "auser","date" : datetime.datetime.utcnow(), "tradedate":20150122, "metric": "metricA", }
     doc["vals"] = [{'min': i, 'orders': 0}for i in range(60)]
     for i in range(num):coll.insert(doc.copy())
 
@@ -22,20 +22,20 @@ def insert_array_doc():
 
 def insert_dict_doc():
     coll.remove({})
-    doc = {"ccypair" : "ALL","collat" : "INDIAN","date" : datetime.datetime.utcnow(), "tradedate":20150122, "metric": "metricA", }
+    doc = {"type" : "ALL","user" : "auser","date" : datetime.datetime.utcnow(), "tradedate":20150122, "metric": "metricA", }
     doc["vals"] = {str(i):{'orders': 0}for i in range(60)}
     for i in range(num):coll.insert(doc.copy())
 
 def bulk_insert_array_doc():
     coll.remove({})
-    doc = {"ccypair" : "ALL","collat" : "INDIAN","date" : datetime.datetime.utcnow(), "tradedate":20150122, "metric": "metricA", }
+    doc = {"type" : "ALL","user" : "auser","date" : datetime.datetime.utcnow(), "tradedate":20150122, "metric": "metricA", }
     doc["vals"] = [{'min': i, 'orders': 0}for i in range(60)]
     docs = [doc.copy() for i in range(num)]
     coll.insert(docs)
 
 def bulk_insert_dict_doc():
     coll.remove({})
-    doc = {"ccypair" : "ALL","collat" : "INDIAN","date" : datetime.datetime.utcnow(), "tradedate":20150122, "metric": "metricA"}
+    doc = {"type" : "ALL","user" : "auser","date" : datetime.datetime.utcnow(), "tradedate":20150122, "metric": "metricA"}
     doc["vals"] = {str(i):{'orders': 0}for i in range(60)}
     docs = [doc.copy() for i in range(num)]
     coll.insert(docs)
