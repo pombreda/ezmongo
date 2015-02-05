@@ -1,0 +1,118 @@
+db.sidtest.insert({"ccypair" : "ALL","collat" : "AMERICAN","date" : ISODate("2015-01-21T17:00:00Z"), "tradedate":20150121, "metric": "metricA","vals": {"0": {"orders" : 2,},"1": {"orders" : 2,}}})
+
+db.sidtest.insert({"ccypair" : "ALL","collat" : "INDIAN","date" : ISODate("2015-01-21T17:00:00Z"), "tradedate":20150121, "metric": "metricA","vals": {"0": {"orders" : 7,},"3": {"orders" : 4,}}})
+
+db.sidtest.insert({"ccypair" : "ALL","collat" : "INDIAN","date" : ISODate("2015-01-21T18:00:00Z"),"tradedate":20150121, "metric": "metricA","vals": {"0": {"orders" : 6,},"2": {"orders" : 4,}}})
+
+db.sidtest.insert({"ccypair" : "ALL","collat" : "INDIAN","date" : ISODate("2015-01-22T18:00:00Z"), "tradedate":20150122, "metric": "metricA","vals": {"0": {"orders" : 6,},"2": {"orders" : 4,}}})
+
+
+ARRAY
+-----
+
+
+GET SUM OF ALL ORDERS FOR ALL MINUTES IN ALL MATCHED DOCUMENTS
+
+- db.sidtest.aggregate([{
+    $match: {
+        ccypair: 'ALL',
+        tradedate: 20150122
+    },
+    {$unwind: "$vals"}, {$group: {_id: null, "total_orders": {$sum: '$vals.orders'}}}
+])
+
+
+GET TOP 10 MINUTES WITH LARGEST NUMBER OF ORDERS IN WHOLE TRADING DAY
+
+- db.sidtest.aggregate([$match: {
+        ccypair: 'ALL',
+        tradedate: 20150122
+    }, {$unwind: "$vals"}, {$sort: {'vals.orders': -1}}, {$limit: 10}])
+
+
+
+{
+    "ccypair" : "ALL",
+    "collat" : "INDIAN",
+    "date" : datetime.datetime.utcnow(),
+    "tradedate":20150122,
+    "metric": "metricA",
+    "vals": [
+        { "min": 0, "orders": 1  },
+        { "min": 3, "orders": 1  }
+    ]
+}
+
+
+
+
+
+
+match = {
+    $match: {
+        ccypair: 'ALL',
+        tradedate: 20150122
+    }
+}
+db.sidtest.aggregate([match])
+
+
+select sum(order) from hsdata where tradedate=20150900 and ccypair='all' and collat='america'
+
+#- take all documents for tradedate/collat/ccypair
+#- for each document sum orders in each minute
+
+
+
+
+# Array Stats
+
+> db.sidtest.stats()
+{
+	"ns" : "sidtest.sidtest",
+	"count" : 100000,
+	"size" : 203200000,
+	"avgObjSize" : 2032,
+	"storageSize" : 243314688,
+	"numExtents" : 13,
+	"nindexes" : 1,
+	"lastExtentSize" : 68579328,
+	"paddingFactor" : 1,
+	"systemFlags" : 1,
+	"userFlags" : 1,
+	"totalIndexSize" : 3262224,
+	"indexSizes" : {
+		"_id_" : 3262224
+	},
+	"ok" : 1
+}
+
+31.1111731529 s to insert 100,000 docs
+bulk insert 12.5 s
+
+# Dict Stats
+
+> db.sidtest.stats()
+{
+	"ns" : "sidtest.sidtest",
+	"count" : 100000,
+	"size" : 203200000,
+	"avgObjSize" : 2032,
+	"storageSize" : 243314688,
+	"numExtents" : 13,
+	"nindexes" : 1,
+	"lastExtentSize" : 68579328,
+	"paddingFactor" : 1,
+	"systemFlags" : 1,
+	"userFlags" : 1,
+	"totalIndexSize" : 3262224,
+	"indexSizes" : {
+		"_id_" : 3262224
+	},
+	"ok" : 1
+}
+
+
+
+27.9274659157 s to insert 100,000 docs
+bulk insert 8.9 s
