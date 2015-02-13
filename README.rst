@@ -6,45 +6,9 @@ An attempt to parse SQL and generate meaningful MongoDB query expressions. The p
 to solve is that of providing an intuitive SQL interface for accessing MongoDB data, especially when it involves
 denormalized data stored in arrays and objects inside a collection.
 
-UNWIND EXAMPLE
---------------
 
-> db.sidtest.insert({type:"new", vals:[{orders:4, trades:2, min:1}, {orders:8, trades:4, min:2}]})
-WriteResult({ "nInserted" : 1 })
-> db.sidtest.insert({type:"new", vals:[{orders:14, trades:12, min:11}, {orders:18, trades:14, min:12}]})
-WriteResult({ "nInserted" : 1 })
-
-> db.sidtest.aggregate([{"$match":{type:'new'}}, {"$unwind": '$vals'}, {"$project": {type:1, orders:'$vals.orders'}}])
-{ "_id" : ObjectId("54dc2a4c53f2873d69794326"), "type" : "new", "orders" : 4 }
-{ "_id" : ObjectId("54dc2a4c53f2873d69794326"), "type" : "new", "orders" : 8 }
-{ "_id" : ObjectId("54dc2a5d53f2873d69794327"), "type" : "new", "orders" : 14 }
-{ "_id" : ObjectId("54dc2a5d53f2873d69794327"), "type" : "new", "orders" : 18 }
-
-> db.sidtest.aggregate([{"$match":{type:'new'}}, {"$project": {type:1, orders:'$vals.orders'}}])
-{ "_id" : ObjectId("54dc2a4c53f2873d69794326"), "type" : "new", "orders" : [ 4, 8 ] }
-{ "_id" : ObjectId("54dc2a5d53f2873d69794327"), "type" : "new", "orders" : [ 14, 18 ] }
->
-
-
-Assuming the collection structure below:
-
-{ "_id" : ObjectId("54dc2a4c53f2873d69794326"), "type" : "new", "otherfld": 'whatever1', "vals" : [ { "orders" : 4, "trades" : 2, "min" : 1 }, { "orders" : 8, "trades" : 4, "min" : 2 } ] }
-{ "_id" : ObjectId("54dc2a5d53f2873d69794327"), "type" : "new", "otherfld": 'whatever2', "vals" : [ { "orders" : 14, "trades" : 12, "min" : 11 }, { "orders" : 18, "trades" : 14, "min" : 12 } ] }
-
-- SELECT type, vals from SIDTEST
-  - { "_id" : ObjectId("54dc2a4c53f2873d69794326"), "type" : "new", "vals" : [ { "orders" : 4, "trades" : 2, "min" : 1 }, { "orders" : 8, "trades" : 4, "min" : 2 } ] }
-  - { "_id" : ObjectId("54dc2a4c53f2873d69794326"), "type" : "new", "vals" : [ { "orders" : 4, "trades" : 2, "min" : 1 }, { "orders" : 8, "trades" : 4, "min" : 2 } ] }
-
-- SELECT type, vals.orders from SIDTEST
-  - { "_id" : ObjectId("54dc2a4c53f2873d69794326"), "type" : "new", "vals" : [ { "orders" : 4 }, { "orders" : 8} ] }
-  - { "_id" : ObjectId("54dc2a4c53f2873d69794326"), "type" : "new", "vals" : [ { "orders" : 4, "trades" : 2, "min" : 1 }, { "orders" : 8, "trades" : 4, "min" : 2 } ] }
-
-- SELECT type, SUM(vals.orders) from SIDTEST
- - db.sidtest.aggregate([{"$match":{type:'new'}}, {"$unwind": "$vals"}, {"$group": {_id: null, 'orders': {'$sum': '$vals.orders'} } }])
-
-
-Slightly different schema
--------------------------
+Test schema
+-----------
 
 db.sidtest.insert({userid:"sid", metric: 'latency', vals:[{latency1:1, latency2:2, min:1}, {latency1:1, latency2:2, min:3}]})
 
