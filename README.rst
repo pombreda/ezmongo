@@ -2,7 +2,9 @@
 SUMMARY
 -------
 
-An attempt to parse SQL and generate meaningful MongoDB query expressions.
+An attempt to parse SQL and generate meaningful MongoDB query expressions. The problem this project is trying
+to solve is that of providing an intuitive SQL interface for accessing MongoDB data, especially when it involves
+denormalized data stored in arrays and objects inside a collection.
 
 UNWIND EXAMPLE
 --------------
