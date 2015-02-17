@@ -72,12 +72,17 @@ class SqlToMongo():
             # for something like "SUM(ORDERS) as TOTALORDERS" don't project the alias as GROUP BY will take care
             # of it after aggregation
             alias = fld
-        if not self.schema.is_array(fld):
-            return {"{FLD}".format(FLD=alias): "${FLD}".format(FLD=fld)}, "id"
+        if sel.get("is_array"):
+            if sel.get("array_fld", None):
+                # if array of objects then project specific field
+                return {"{FLD}".format(FLD=alias): "${FLD}".format(FLD=fld)}
+            else:
+                # if not an array of objects then project whole array
+                return {"{FLD}".format(FLD=alias): "${FLD}".format(FLD=sel.get("array_name"))}
         else:
             return {
                 "{FLD}".format(FLD=alias): "${FLD}".format(FLD=fld)
-            }, "array"
+            }
 
         return None
 
@@ -96,7 +101,7 @@ class SqlToMongo():
         return {sortfld: order}
 
 
-    def gen_grp(groupby, sel_funcs):
+    def gen_grp(self, groupby, sel_funcs):
         group = {"$group": {}}
         inner = group.get("$group")
         if not len(groupby):
@@ -132,18 +137,35 @@ class SqlToMongo():
                 match.get("$match").update(res)
 
         sel_funcs = []
+        sel_data = []
         unwinds = []
         project = None
         if len(select):
             project = {"$project": {}}
+        has_array, has_func = False, False
         for fld, sel in select.items():
             print fld
+            dottoks = fld.split(".")
+            is_array = False
+            if self.schema.is_array(dottoks[0]) or (len(dottoks) == 2 and self.schema.is_array(dottoks[0])):
+                is_array = True
+                if not has_array:
+                    has_array = True
+            sel["is_array"] = is_array
+            if is_array:
+                sel["array_name"] = dottoks[0]
+                if len(dottoks) == 2:
+                    # array of objects (e.g. vals.min) as opposed to array of basic types
+                    sel["array_fld"] = dottoks[1]
+                    unwinds.append(sel)
             if sel.get("type") == "func":
                 sel_funcs.append(sel)
-            res, restype = self.gen_sel(fld, sel)
+                if not has_func:
+                    has_func = True
+            res = self.gen_sel(fld, sel)
             project.get("$project").update(res)
-            if restype == "array" and self.schema.get_always_unwind(fld):
-                unwinds.append(fld)
+
+
 
         group = None
         if len(groupby) or len(sel_funcs):
@@ -165,10 +187,16 @@ class SqlToMongo():
             print match
         if project:
             print project
-        unwind = None
+        unwind = []
+        unwound = []
         if unwinds:
             print unwinds
-            unwind = [{"$unwind": "${FLD}".format(FLD=fld)} for fld in unwinds]
+            for fld in unwinds:
+                array_name = fld.get("array_name")
+                if not array_name in unwound:
+                    unwind.append({"$unwind": "${FLD}".format(FLD=array_name)})
+                    unwound.append(array_name)
+
         if group:
             print group
         if sort:
@@ -206,17 +234,13 @@ class SqlToMongo():
         res = sqlparse.parse(sqlstr)
         if self.dbg >= 3:
             print "-----", res, type(res[0]), "-----"
-        last_tok = None
-        curr_fld = None
         for tok in res[0].tokens:
             if tok.is_whitespace():
-                last_tok = tok
                 continue
             tokval = tok.value.strip().lower()
             if self.dbg >= 3:
                 print "-----*%s*"%tokval, type(tok), tok.is_keyword, state, "-----"
             if tokval in puncts:
-                last_tok = tok
                 continue
             if tok.is_keyword:
                 # change state if know keyword otherwise leave state unchanged
@@ -224,10 +248,8 @@ class SqlToMongo():
                     state = tokval.upper()
                     if self.dbg >= 3:
                         print "state -->", state
-                    last_tok = tok
                     continue
                 if tokval in ("by"):
-                    last_tok = tok
                     continue
             if isinstance(tok, sqlparse.sql.Identifier):
                 if state == "SELECT":
@@ -262,6 +284,14 @@ class SqlToMongo():
                                     if self.dbg >= 3:
                                         print "\t\tADDING SELECT 2:", funcparts
                                     select[funcparts.get("fld")] = funcparts
+                                elif isinstance(id, sqlparse.sql.Identifier):
+                                    idstr = ""
+                                    for tmptok in id.tokens:
+                                        tmptoktxt = tmptok.value.strip().lower()
+                                        if tmptoktxt == "as":
+                                            break
+                                        idstr += tmptoktxt
+                                    select[idstr] = {'fld': idstr, 'type':'id', 'alias': alias}
                             else:
                                 print "\t\tADDING SELECT 3:", {"fld": idval, "type": "id"}
                                 select[idval] = {'fld': idval, 'type': 'id'}
@@ -355,12 +385,13 @@ if __name__ == "__main__":
     print schema
     sqm = SqlToMongo(schema.get("myschema"))
     sqm.run_mongo(
+        #"select userid, sum(vals.min) as valmin from sidtest where metric='latency' order by orders desc limit 3")
+        #"select userid, vals as valmin from sidtest where metric='latency' order by orders desc limit 3")
         "select userid, vals.min as valmin from sidtest where metric='latency' order by orders desc limit 3")
 
-    # todo: above query doesn't work (alias with projecting array)
-    # todo: select userid, vals.min from sidtest where metric='latency' order by orders desc limit 3 --> this
-        # todo: query projects the correct element 'min' of the array but ends up making an object with an element min
-        # todo: in the output as well
+    # todo: write test cases for the 3 (2 commented and 1 live) queries above - believe they are working correctly
+    # todo: now.
+    # todo: Test grouping (group by)  
 
     #sqm.run_mongo(
     #    "select user, sum(vals.orders) from sidtest where tradedate=20150205 and ccypair='EURUSD' and metric='qd' order by orders desc limit 3")

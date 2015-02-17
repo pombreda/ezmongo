@@ -74,3 +74,13 @@ class EZMongoTests(unittest.TestCase):
         self.assertEqual(conditions.get('metric').get('val'), "'qd'")
         self.assertEqual(limit, 3)
         self.assertEqual(order.get("orders desc").get('fld'), 'orders desc')
+
+    def test_array_with_alias(self):
+        sqm = SqlToMongo(self.schema.get("myschema"))
+        select, table, conditions, group, order, limit = sqm.convert_to_mongo(
+            "select userid, vals.min as valmin from sidtest where metric='latency' order by orders desc limit 3")
+        print select, table, conditions, group, order, limit
+        self.assertEqual(select.get("userid", None).get('fld'), 'userid')
+        self.assertEqual(select.get("vals.min", None).get('fld'), 'vals.min')
+        self.assertEqual(limit, 3)
+        self.assertEqual(order.get("orders desc").get('fld'), 'orders desc')
