@@ -19,8 +19,9 @@ opmaps = {
 
 
 def execute_mongo(match, unwind, project, group, sort, limit):
-    print "----------execute_mongo---------------"
-    print match, unwind, project, group, sort, limit
+    dbg = 0
+    #print "----------execute_mongo---------------"
+    #print match, unwind, project, group, sort, limit
     client = MongoClient('localhost', 27017)
     db = client.sidtest
     coll = db.sidtest
@@ -36,15 +37,15 @@ def execute_mongo(match, unwind, project, group, sort, limit):
         pipeline.append(sort)
     if limit:
         pipeline.append(limit)
-    print pipeline
+    if dbg > 0:
+        print pipeline
     res = coll.aggregate(pipeline)
-    for r in res.get("result"):
-        print r
+    return res
 
 
 class SqlToMongo():
     def __init__(self, schema):
-        self.dbg = 3
+        self.dbg = 0
         self.schema = schema
 
     def gen_cond(self, cond):
@@ -63,7 +64,8 @@ class SqlToMongo():
         return None
 
     def gen_sel(self, fld, sel):
-        print "Gen_sel", sel
+        if self.dbg > 3:
+            print "Gen_sel", sel
         fldtype = sel.get("type")
         if fldtype == "id":
             # For something like "ORDERS as CLIENTORDERS" project the alias
@@ -119,13 +121,14 @@ class SqlToMongo():
 
 
     def gen_mongo(self, select, table, conditions, groupby, order, limit):
-        print "-------------------gen_mongo-------------------"
-        print "SELECT=", select
-        print "table=", table
-        print "conditions=", conditions
-        print "group=", groupby
-        print "order=", order
-        print "limit=", limit
+        if self.dbg > 1:
+            print "-------------------gen_mongo-------------------"
+            print "SELECT=", select
+            print "table=", table
+            print "conditions=", conditions
+            print "group=", groupby
+            print "order=", order
+            print "limit=", limit
 
         match = None
         if len(conditions):
@@ -144,7 +147,6 @@ class SqlToMongo():
             project = {"$project": {}}
         has_array, has_func = False, False
         for fld, sel in select.items():
-            print fld
             dottoks = fld.split(".")
             is_array = False
             if self.schema.is_array(dottoks[0]) or (len(dottoks) == 2 and self.schema.is_array(dottoks[0])):
@@ -183,40 +185,28 @@ class SqlToMongo():
             sort.get("$sort").update(res)
         if limit != -1:
             limit = {"$limit": limit}
-        if match:
-            print match
-        if project:
-            print project
         unwind = []
         unwound = []
         if unwinds:
-            print unwinds
             for fld in unwinds:
                 array_name = fld.get("array_name")
                 if not array_name in unwound:
                     unwind.append({"$unwind": "${FLD}".format(FLD=array_name)})
                     unwound.append(array_name)
 
-        if group:
-            print group
-        if sort:
-            print sort
-        if limit:
-            print limit
         # execute
 
-        execute_mongo(match, unwind, project, group, sort, limit)
+        return execute_mongo(match, unwind, project, group, sort, limit)
 
 
     def parse_function(self, tok):
         print "\t\tparse_function:tok=%s,tok.tokens=%s"%(tok, tok.tokens)
         oper, ident = None, None
         for subtok in tok.tokens:
-            # print subtok, type(subtok)
             if isinstance(subtok, sqlparse.sql.Parenthesis):
-                # print "Got paran", subtok.tokens
                 for parentok in subtok.tokens:
-                    print "\t\tparentok=%s"%parentok,type(parentok)
+                    if self.dbg > 3:
+                        print "\t\tparentok=%s"%parentok,type(parentok)
                     if isinstance(parentok, sqlparse.sql.Identifier):
                         ident = parentok.value.strip()
             elif isinstance(subtok, sqlparse.sql.Identifier):
@@ -293,12 +283,15 @@ class SqlToMongo():
                                         idstr += tmptoktxt
                                     select[idstr] = {'fld': idstr, 'type':'id', 'alias': alias}
                             else:
-                                print "\t\tADDING SELECT 3:", {"fld": idval, "type": "id"}
+                                if self.dbg > 3:
+                                    print "\t\tADDING SELECT 3:", {"fld": idval, "type": "id"}
                                 select[idval] = {'fld': idval, 'type': 'id'}
             elif isinstance(tok, sqlparse.sql.Function):
-                print "Got a function", tok.tokens
+                if self.dbg > 3:
+                    print "Got a function", tok.tokens
                 funcparts = self.parse_function(tok)
-                print "ADDING SELECT 4:", funcparts
+                if self.dbg > 3:
+                    print "ADDING SELECT 4:", funcparts
                 select[funcparts.get("fld")] = funcparts
                 if self.dbg >= 3:
                     print "FUNCTION-Y:", funcparts
@@ -391,38 +384,7 @@ if __name__ == "__main__":
 
     # todo: write test cases for the 3 (2 commented and 1 live) queries above - believe they are working correctly
     # todo: now.
-    # todo: Test grouping (group by)  
-
-    #sqm.run_mongo(
-    #    "select user, sum(vals.orders) from sidtest where tradedate=20150205 and ccypair='EURUSD' and metric='qd' order by orders desc limit 3")
+    # todo: Test grouping (group by)
 
 
-    # convert_to_mongo(
-    # "select date, min, sum(orders) as totord from sidtest where tradedate=20150205 and ccypair='EURUSD' and metric='qd' group by date, min order by totord desc limit 3")
-
-
-
-
-    # match = {'$match': {'metric': 'qd', 'ccypair': 'EURUSD', 'tradedate': 20150205}}
-    # project = {'$project': {'date': '$date', 'trades': '$vals.trades', 'orders': '$vals.orders', 'minute': '$vals.minute'}}
-    # sort = {'$sort': {'orders': -1}}
-    # limit = {'$limit': 3}
-
-    # query with sum
-
-    # ORIGINAL
-
-    # match = {'$match': {'metric': 'qd', 'ccypair': 'EURUSD', 'tradedate': 20150205}}
-    # unwind
-    # project = {'$project': {'date': '$date', 'min': '$vals.min', 'orders': '$vals.orders'}}
-    # group = {$group: {_id: {date: '$date', minute: '$minute'}, totord: {$sum: "orders"}}}
-    # sort = {'$sort': {'totord': -1}}
-    # limit = {'$limit': 3}
-
-
-    #GENERATED
-
-    #match = {'$match': {'metric': 'qd', 'ccypair': 'EURUSD', 'tradedate': 20150205}}
-    #project = {'$project': {'date': '$date', 'orders': '$vals.orders', 'min': '$vals.min'}}
-    #group = {'$group': {'_id': {'date': '$date', 'min': '$min'}, 'totord': {'$sum': 'orders'}}}
 

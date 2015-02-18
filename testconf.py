@@ -9,7 +9,7 @@ val_schema.add_fields(["orders", "trades"], float)
 
 myschema.add_array("vals", object, val_schema, always_unwind=True)
 
-print myschema
+#print myschema
 # Representation of a schema similar to the one depicted below:
 #
 # {
