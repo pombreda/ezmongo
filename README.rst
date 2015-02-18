@@ -7,63 +7,21 @@ to solve is that of providing an intuitive SQL interface for accessing MongoDB d
 denormalized data stored in arrays and objects inside a collection.
 
 
-Test schema
------------
+The Basic Idea
+--------------
 
-db.sidtest.insert({userid:"sid", metric: 'latency', vals:[{latency1:1, latency2:2, min:1}, {latency1:1, latency2:2, min:3}]})
+The idea is to define a schema (see testconf.py) corresponding to the expected structure of a collection. The schema
+doesn't need to have all the possible/expected fields but will mainly be used for figuring how to treat any
+compound elements (such as arrays or array of objects).
 
-> db.sidtest.find()
-{ "_id" : ObjectId("54dd7efb53f2873d69794328"), "userid" : "sid", "metric" : "latency", "vals" : [ { "latency1" : 1, "latency2" : 2, "min" : 1 }, { "latency1" : 1, "latency2" : 2, "min" : 3 } ] }
+The problem that is being attempted to be solved here is that of easily making simple SQL queries against
+MongoDB collections. SQL is converted into a MongoDB Aggregation Pipeline. In most cases this is straight-forward
+but it gets tricky when we have arrays. For example, when storing time series data in documents where each
+document contains an array "vals" which has an object for a second (or a minute). Aggregation over such schemata
+requires a better understanding of the MongoDB aggregation pipeline (including the $unwind operator).
+This project tries to provide an easy SQL interface for such schemata, in order to avoid an adoption barrier as well as
+a learning curve for those who haven't mastered the MongoDB query language/aggregation pipeline.
 
-{ "_id" : ObjectId("54dd7f1153f2873d69794329"), "userid" : "sid", "metric" : "latency", "vals" : [ { "latency1" : 11, "latency2" : 12, "min" : 1 }, { "latency1" : 2, "latency2" : 4, "min" : 3 } ] }
-
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "userid" : "sid", "metric" : "latency", "vals" : [ { "latency1" : 11, "latency2" : 12, "min" : 1 }, { "latency1" : 2, "latency2" : 4, "min" : 3 } ], "vals2" : [ 22, 23, 24 ] }
-
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "userid" : "sid", "metric" : "latency", "vals" : [ { "latency1" : 11, "latency2" : 12, "min" : 1 }, { "latency1" : 2, "latency2" : 4, "min" : 3 } ], "vals2" : [ 32, 33, 34 ] }\
-
-> db.sidtest.aggregate([{'$match':{userid: 'sid'}}, {'$project': {latency1: '$vals.latency1'}}])
-{ "_id" : ObjectId("54dd7efb53f2873d69794328"), "latency1" : [ 1, 1 ] }
-{ "_id" : ObjectId("54dd7f1153f2873d69794329"), "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "latency1" : [ 11, 2 ] }
-> db.sidtest.aggregate([{'$match':{userid: 'sid'}}, {'$project': {latency1: '$vals.latency1', vals2: '$vals2'}}])
-{ "_id" : ObjectId("54dd7efb53f2873d69794328"), "latency1" : [ 1, 1 ] }
-{ "_id" : ObjectId("54dd7f1153f2873d69794329"), "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : [ 22, 23, 24 ], "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : [ 32, 33, 34 ], "latency1" : [ 11, 2 ] }
-> db.sidtest.aggregate([{'$match':{userid: 'sid'}}, {'$unwind': '$vals2'}, {'$project': {latency1: '$vals.latency1', vals2: '$vals2'}}])
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 22, "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 23, "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 24, "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 32, "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 33, "latency1" : [ 11, 2 ] }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 34, "latency1" : [ 11, 2 ] }
-> db.sidtest.aggregate([{'$match':{userid: 'sid'}}, {'$unwind': '$vals2'}, {'$unwind': '$vals'}, {'$project': {latency1: '$vals.latency1', vals2: '$vals2'}}])
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 22, "latency1" : 11 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 22, "latency1" : 2 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 23, "latency1" : 11 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 23, "latency1" : 2 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 24, "latency1" : 11 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 24, "latency1" : 2 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 32, "latency1" : 11 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 32, "latency1" : 2 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 33, "latency1" : 11 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 33, "latency1" : 2 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 34, "latency1" : 11 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 34, "latency1" : 2 }
-> db.sidtest.aggregate([{'$match':{userid: 'sid'}}, {'$unwind': '$vals'}, {'$unwind': '$vals2'}, {'$project': {latency1: '$vals.latency1', vals2: '$vals2'}}])
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 22, "latency1" : 11 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 23, "latency1" : 11 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 24, "latency1" : 11 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 22, "latency1" : 2 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 23, "latency1" : 2 }
-{ "_id" : ObjectId("54dd801f53f2873d6979432a"), "vals2" : 24, "latency1" : 2 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 32, "latency1" : 11 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 33, "latency1" : 11 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 34, "latency1" : 11 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 32, "latency1" : 2 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 33, "latency1" : 2 }
-{ "_id" : ObjectId("54dd802553f2873d6979432b"), "vals2" : 34, "latency1" : 2 }
 
 LIMITATIONS
 -----------
